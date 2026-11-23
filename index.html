@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Inbar — Plates</title>
+<link rel="icon" href="assets/logo-black.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bp:#0f3c91; --bp-d:#0a2a6b; --ink:#eef4ff; --mute:#9db8ea; --paper:#f3efe4;
+  --line:rgba(255,255,255,.10); --edge:rgba(255,255,255,.55);
+  --o2:cubic-bezier(.25,.46,.45,.94); --o5:cubic-bezier(.23,1,.32,1); --o6:cubic-bezier(.19,1,.22,1); --i4:cubic-bezier(.895,.03,.685,.22);
+  --sans:"Inter Tight","Helvetica Neue",Arial,sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bp);color:var(--ink);font:400 16px/20px var(--sans);-webkit-font-smoothing:antialiased;user-select:none}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+::selection{background:#fff;color:var(--bp)}
+
+/* blueprint paper: 20px minor / 100px major grid */
+.bp-bg{
+  background-color:var(--bp);
+  background-image:
+    linear-gradient(rgba(255,255,255,.17) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.17) 1px,transparent 1px),
+    linear-gradient(var(--line) 1px,transparent 1px),
+    linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:100px 100px,100px 100px,20px 20px,20px 20px;
+  background-position:-1px -1px;
+}
+
+/* ---------- card engine (Work) ---------- */
+#cards{position:fixed;inset:0;z-index:1;overflow:hidden;touch-action:none}
+body[data-mode="out"] #cards{cursor:grab}
+body.dragging #cards{cursor:grabbing}
+.card,.tile{position:absolute;left:0;top:0;will-change:transform,width,height;outline:1px solid transparent;outline-offset:7px;transition:outline-color .5s}
+.card{display:none}
+body[data-mode="out"] .card{outline-color:var(--edge)}
+.tile{outline-color:var(--edge);outline-offset:0}
+.cm{position:absolute;inset:0;overflow:hidden;background:rgba(255,255,255,.08);isolation:isolate}
+.cm img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;object-position:50% 38%;opacity:0;transition:opacity .6s var(--o2);will-change:transform;pointer-events:none;-webkit-user-drag:none}
+.cm img.ld{opacity:1}
+/* blueprint cyanotype tint, per photo */
+.cm::after{content:"";position:absolute;inset:0;background:#2459cf;mix-blend-mode:multiply;opacity:.5;transition:opacity .6s var(--o2);pointer-events:none}
+body.clean .cm::after{opacity:0}
+.cap{position:absolute;left:0;right:0;top:calc(100% + 16px);display:flex;justify-content:space-between;gap:8px;white-space:nowrap;
+  font:400 10.5px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.07em;color:var(--mute);opacity:0;transition:opacity .5s;pointer-events:none}
+body[data-mode="out"] .cap{opacity:1}
+#intro{position:fixed;inset:0;z-index:2;overflow:hidden;pointer-events:none}
+
+/* blueprint grid drawn on the photo itself (hero only) */
+.card .cm::before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity .8s var(--o2);
+  background-image:
+    linear-gradient(rgba(255,255,255,.22) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.22) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.09) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.09) 1px,transparent 1px);
+  background-size:100px 100px,100px 100px,20px 20px,20px 20px;background-position:-1px -1px}
+body[data-mode="in"]:not(.introing) .card .cm::before{opacity:.8}
+body.clean[data-mode="in"]:not(.introing) .card .cm::before{opacity:.25}
+
+/* sheet frame + rulers */
+#frame{position:fixed;inset:16px;border:1px solid var(--edge);z-index:90;pointer-events:none}
+#frame::before,#frame::after{content:"";position:absolute;pointer-events:none}
+#frame::before{left:0;right:0;top:0;height:7px;background:repeating-linear-gradient(90deg,var(--edge) 0 1px,transparent 1px 10px)}
+#frame::after{top:0;bottom:0;left:0;width:7px;background:repeating-linear-gradient(0deg,var(--edge) 0 1px,transparent 1px 10px)}
+#frame i{position:absolute;pointer-events:none}
+#frame i.tx{left:0;right:0;top:0;height:13px;background:repeating-linear-gradient(90deg,var(--edge) 0 1px,transparent 1px 100px)}
+#frame i.ty{top:0;bottom:0;left:0;width:13px;background:repeating-linear-gradient(0deg,var(--edge) 0 1px,transparent 1px 100px)}
+
+/* crosshairs */
+#cross{position:fixed;inset:0;z-index:10;pointer-events:none}
+#cross button{position:absolute;top:calc(50% - 11px);width:22px;height:22px;pointer-events:all;opacity:0;transition:opacity .6s var(--o2)}
+#cross svg{display:block;fill:#fff;transition:transform 1200ms var(--o6)}
+#cx1{left:16.1979vw} #cx2{right:16.1979vw} #cx3{right:calc(50% - 11px);pointer-events:none!important;transition-delay:.3s!important}
+#cx1 svg,#cx2 svg{transform:rotate(-90deg) scale(.4)}
+body.s-cross[data-mode="in"] #cx1,body.s-cross[data-mode="in"] #cx2{opacity:1}
+body.s-cross #cx1 svg,body.s-cross #cx2 svg{transform:rotate(var(--r,0deg))}
+body[data-mode="out"] #cx3{opacity:1}
+body:not(.s-cross) #cross button,body[data-mode="out"] #cx1,body[data-mode="out"] #cx2{pointer-events:none}
+
+/* title */
+#title-w{position:fixed;z-index:11;left:50%;top:calc(50% - 1.6vw);transform:translateX(-50%);pointer-events:none;overflow:hidden;display:grid;padding:.4em .6em;margin:-.4em -.6em}
+#title-w .t{grid-area:1/1;display:flex;justify-content:center;align-items:flex-start;gap:.5em;white-space:nowrap;
+  font-size:clamp(28px,3.125vw,60px);line-height:1.3;letter-spacing:-.015em;transition:transform 900ms var(--o5);pointer-events:all;cursor:pointer}
+#title-w .t sup{font:400 11px/1 var(--mono);letter-spacing:0;margin-top:.55em;opacity:.8}
+#title-w .t.t-in{transform:translateY(112%)} #title-w .t.t-out{transform:translateY(-112%);pointer-events:none}
+body[data-mode="out"] #title-w .t{pointer-events:none}
+
+/* nav (masked slide-up like the reference) */
+#nav{position:fixed;z-index:95;top:37px;left:0;width:100%;display:flex;justify-content:center;pointer-events:none}
+#nav div{margin:0 22px;white-space:nowrap;overflow:hidden}
+.nav-a{display:block;opacity:.4;pointer-events:all;transform:translateY(110%);transition:opacity 300ms var(--o2),transform 1000ms var(--o5)}
+body.ready .nav-a{transform:none}
+.nav-a.on,.nav-a:hover{opacity:1}
+
+/* pagination + thumbs */
+#pgn{position:fixed;z-index:11;bottom:36px;left:50%;transform:translate(-50%,20px);opacity:0;font-variant-numeric:tabular-nums;white-space:nowrap;display:flex;gap:.6em;transition:opacity .8s var(--o2),transform 1000ms var(--o5)}
+/* rolling counter: current number slides up and is cropped, the next one rises in from below */
+#pgn .pg-n{display:block;height:20px;overflow:hidden;text-align:right}
+#pgn .pg-col{display:block;transition:transform 900ms var(--o5);will-change:transform}
+#pgn .pg-col i{display:block;font-style:normal;height:20px;line-height:20px}
+#pgn .pg-t{display:block;height:20px;line-height:20px}
+body.ready #pgn{opacity:1;transform:translateX(-50%)}
+#thumbs{position:fixed;z-index:11;right:40px;bottom:36px;width:min(340px,30vw);height:26px;overflow:hidden;transition:opacity .5s,transform .8s var(--o5);
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent);mask-image:linear-gradient(90deg,transparent,#000 14%,#000 86%,transparent)}
+body[data-mode="out"] #thumbs{opacity:0;transform:translateY(70px);pointer-events:none}
+#thumbs-in{display:flex;gap:6px;height:100%;transition:transform 800ms var(--o5);will-change:transform}
+#thumbs-in button{flex:0 0 38px;height:100%;opacity:.45;outline:1px solid transparent;outline-offset:2px;overflow:hidden;
+  transform:translateY(140px);transition:opacity .3s,outline-color .3s,transform 1500ms var(--o6)}
+body.s-thumbs #thumbs-in button{transform:none}
+#thumbs-in button img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.6)}
+#thumbs-in button:hover{opacity:.85}
+#thumbs-in button.on{opacity:1;outline-color:#fff}
+@media (max-width:900px){#thumbs{display:none}}
+
+@media (max-width:700px){#pgn{bottom:30px;left:auto;right:30px;transform:translateY(20px)}body.ready #pgn{transform:none}}
+
+/* hide Work-UI in other views */
+body:not([data-view="work"]) #cross,body:not([data-view="work"]) #title-w,body:not([data-view="work"]) #pgn,body:not([data-view="work"]) #thumbs{opacity:0;pointer-events:none}
+body:not([data-view="work"]) #cross button,body:not([data-view="work"]) #title-w .t{pointer-events:none}
+body:not([data-view="work"]) #cards{visibility:hidden;transition:visibility 0s .6s}
+body[data-mode="out"] #pgn{opacity:1}
+
+/* ---------- overlays ---------- */
+.ov{position:fixed;inset:0;z-index:50;overflow-y:auto;overflow-x:hidden;opacity:0;visibility:hidden;transition:opacity .6s var(--o2),visibility 0s .6s;scrollbar-width:none}
+.ov::-webkit-scrollbar{display:none}
+body[data-view="sheet"] #sheet,body[data-view="about"] #about{opacity:1;visibility:visible;transition:opacity .6s var(--o2)}
+#back{position:fixed;z-index:95;top:37px;left:40px;opacity:0;pointer-events:none;transition:opacity .4s}
+body:not([data-view="work"]) #back{opacity:1;pointer-events:all}
+#back:hover{opacity:.4}
+#sn{position:fixed;z-index:95;top:37px;right:40px;font:400 14px/20px var(--mono);opacity:0;transition:opacity .4s;font-variant-numeric:tabular-nums}
+body[data-view="sheet"] #sn{opacity:1}
+
+/* sheet (project-style page) */
+.s-head{padding:28vh 0 10vw;text-align:center}
+.s-head h1{font-weight:400;font-size:clamp(28px,3.125vw,60px);line-height:1.3;letter-spacing:-.015em}
+.s-head p{margin-top:14px;font:400 11px/1.6 var(--mono);color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+.fig{position:relative;margin:0 auto 12vw;padding:34px 0 0 34px;opacity:0;transform:translateY(40px);transition:opacity 1s var(--o2),transform 1.2s var(--o6)}
+.fig.in{opacity:1;transform:none}
+.fig.land{width:min(52.9vw,900px)} .fig.port{width:min(36vw,620px)}
+.fig .ph{position:relative;background:rgba(255,255,255,.08);outline:1px solid var(--edge);outline-offset:6px}
+.fig .ph img{display:block;width:100%;height:100%;object-fit:cover}
+.fig .ph::after{content:"";position:absolute;inset:0;background:#2459cf;mix-blend-mode:multiply;opacity:.28;transition:opacity .6s;pointer-events:none}
+body.clean .fig .ph::after{opacity:0}
+.fig figcaption{display:flex;justify-content:space-between;gap:12px;margin-top:18px;font:400 10.5px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.07em;color:var(--mute)}
+.dim-x,.dim-y{position:absolute;background:var(--edge)}
+.dim-x{left:34px;right:0;top:13px;height:1px}
+.dim-y{top:34px;left:13px;bottom:calc(1.3em + 18px);width:1px}
+.dim-x::before,.dim-x::after{content:"";position:absolute;top:-5px;width:1px;height:11px;background:var(--edge)}
+.dim-x::before{left:0}.dim-x::after{right:0}
+.dim-y::before,.dim-y::after{content:"";position:absolute;left:-5px;height:1px;width:11px;background:var(--edge)}
+.dim-y::before{top:0}.dim-y::after{bottom:0}
+.dim-x b,.dim-y b{position:absolute;background:var(--bp);padding:0 8px;font:400 10px/14px var(--mono);letter-spacing:.06em;white-space:nowrap}
+.dim-x b{left:50%;top:-7px;transform:translateX(-50%)}
+.dim-y b{top:50%;left:-7px;writing-mode:vertical-rl;padding:8px 0;transform:translateY(-50%) rotate(180deg)}
+.s-end{padding:4vw 0 18vh;text-align:center}
+.s-end a{display:inline-block;transition:opacity .3s}.s-end a:hover{opacity:.4}
+@media (max-width:700px){.fig.land,.fig.port{width:calc(100vw - 96px)}.fig{margin-bottom:22vw}}
+
+/* about */
+#about .wrap{min-height:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:0 40px}
+#about .l{padding:22vh 0 12vh}
+#about .r{padding:22vh 0 14vh 0;font-size:clamp(22px,2.8125vw,54px);line-height:1.3;letter-spacing:-.02em}
+#about .r p+p{margin-top:2.2em}
+#about .r .ts{font-size:clamp(14px,1.25vw,22px);line-height:1.5;color:var(--mute);letter-spacing:-.01em}
+#about .r .ts a{color:var(--ink);transition:opacity .3s}#about .r .ts a:hover{opacity:.5}
+#about .logo{display:block;width:min(360px,100%);height:auto;margin:0 0 22px;pointer-events:none;-webkit-user-drag:none}
+/* blueprint on/off switch (lives on the About page) */
+#tog{display:inline-block;padding:11px 18px;border:1px solid var(--edge);font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;transition:background .25s,color .25s}
+#tog:hover{background:var(--ink);color:var(--bp)}
+@media (max-width:900px){#about .wrap{grid-template-columns:1fr;padding:0 28px}#about .l{padding:18vh 0 6vh}#about .r{padding:0 0 18vh}}
+
+/* loader */
+#loader{position:fixed;inset:0;z-index:200;display:grid;place-items:center}
+#loader.go{background-image:none;background-color:transparent}
+#loader.off{display:none}
+#loader .lc{width:min(260px,60vw);background:var(--paper);color:#0b0b0b;padding:12px;box-shadow:0 0 0 1px #000,0 0 0 6px rgba(255,255,255,.18);transition:transform 1000ms var(--i4),opacity 1000ms var(--i4)}
+#loader.go .lc{transform:translateY(-70vh);opacity:0}
+#loader img{display:block;width:100%}
+#loader .pc{display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid #0b0b0b;font:500 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase}
+#loader .bar{height:3px;background:rgba(0,0,0,.15);margin-top:8px}#loader .bar i{display:block;height:100%;width:0;background:#0b0b0b}
+#empty{position:fixed;inset:0;z-index:12;display:none;place-items:center;text-align:center;font:400 12px/1.7 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+/* ---------- phones / touch ---------- */
+*{-webkit-tap-highlight-color:transparent}
+.ov{overscroll-behavior:contain}
+#cross button::after{content:"";position:absolute;inset:-18px}            /* bigger tap area for the + marks */
+/* Index button: phones have no scroll wheel, so this opens / closes the card row */
+#idxbtn{position:fixed;z-index:95;left:34px;bottom:30px;display:none;padding:12px 6px;margin:-12px -6px;opacity:0;transition:opacity .8s var(--o2);font-size:16px;line-height:20px}
+body.ready #idxbtn{opacity:1}
+#idxbtn .b{display:none} body[data-mode="out"] #idxbtn .a{display:none} body[data-mode="out"] #idxbtn .b{display:inline}
+body:not([data-view="work"]) #idxbtn{opacity:0;pointer-events:none}
+@media (max-width:900px),(hover:none){#idxbtn{display:block}}
+@media (max-width:700px){
+  #nav,#back,#sn{top:30px}
+  #nav div{margin:0 16px}
+  #back{left:34px;padding:10px;margin:-10px}
+  #sn{right:34px}
+  #title-w .t sup{display:none}
+  #cx1{left:6vw} #cx2{right:6vw}
+  #tog{padding:15px 22px}
+  .s-head{padding-top:22vh}
+}
+@media (max-height:560px){                                                /* landscape phone */
+  #nav,#back,#sn{top:26px}
+  .s-head{padding:18vh 0 14vh}
+  #idxbtn{bottom:26px} #pgn{bottom:26px}
+  #about .l{padding-top:16vh} #about .r{padding-top:16vh}
+}
+</style>
+</head>
+<body class="bp-bg introing" data-view="work" data-mode="in">
+
+<div id="cards"></div>
+<div id="intro"></div>
+
+<div id="cross">
+  <button id="cx1" aria-label="Previous plate"><svg viewBox="0 0 22 22"><path d="M10.5 0h1v22h-1zM0 10.5h22v1H0z"/></svg></button>
+  <button id="cx3" tabindex="-1"><svg viewBox="0 0 22 22"><path d="M10.5 0h1v22h-1zM0 10.5h22v1H0z"/></svg></button>
+  <button id="cx2" aria-label="Next plate"><svg viewBox="0 0 22 22"><path d="M10.5 0h1v22h-1zM0 10.5h22v1H0z"/></svg></button>
+</div>
+<div id="title-w"></div>
+<div id="empty">No photos found.<br>Run sync.ps1 to pull the album.</div>
+
+<nav id="nav">
+  <div><a class="nav-a on" id="n-work" href="#">Work</a></div>
+  <div><a class="nav-a" id="n-about" href="#about">About</a></div>
+</nav>
+<a id="back" href="#">Back</a>
+<div id="sn"></div>
+<div id="pgn"></div>
+<button id="idxbtn" type="button" aria-label="Toggle plate index"><span class="a">Index</span><span class="b">Close</span></button>
+<div id="thumbs"><div id="thumbs-in"></div></div>
+
+<div id="frame"><i class="tx"></i><i class="ty"></i></div>
+
+<section id="sheet" class="ov bp-bg" aria-label="All plates"></section>
+
+<section id="about" class="ov bp-bg" aria-label="About">
+  <div class="wrap">
+    <div class="l">
+      <img class="logo" src="assets/logo-black.png" alt="Inbar logo">
+      <button id="tog" type="button">Blueprint ● on</button>
+    </div>
+    <div class="r" id="a-text"></div>
+  </div>
+</section>
+
+<div id="loader" class="bp-bg">
+  <div class="lc"><img src="assets/logo-black.png" alt=""><div class="pc"><span>Loading plates</span><span id="ld-n">0%</span></div><div class="bar"><i id="ld-b"></i></div></div>
+</div>
+
+<script>document.write('<script src="photos.js?d=' + Math.floor(Date.now() / 864e5) + '"><\/script>');</script>
+<script>
+/* ===== edit these ===== */
+const SITE = {
+  name: 'Inbar',
+  titlePrefix: 'Plate',          // slide title: "Plate 01"
+  about: [
+    'Selected work — drawn, photographed and built. Replace this paragraph with a few lines about you.',
+    'Add more paragraphs here. This text lives in the SITE object at the top of index.html.'
+  ],
+  email: ''                       // e.g. 'hello@example.com' (hidden when empty)
+};
+/* ====================== */
+
+const A = window.ALBUM || {photos: [], updated: null};
+const P = A.photos, N = P.length;
+// new random order on every page load (Fisher–Yates) — the hero, card row, thumbs and Sheet all follow it
+for (let i = N - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [P[i], P[j]] = [P[j], P[i]]; }
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2, '0');
+const imgUrl = (p, w) => p.url + '=w' + w;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const iLerp = (a, b, t) => clamp((t - a) / (b - a), 0, 1);
+const loadedAt = Date.now(), SYNC_MS = 24 * 3600 * 1000;
+const FAST = /[?&]fast/.test(location.search) || (matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+const gcd = (a, b) => b ? gcd(b, a % b) : a;
+// date the picture was taken (camera-local day: capture time + the photo's own UTC offset)
+function takenOn(p, short) {
+  if (!p || !p.taken) return null;
+  return new Date(p.taken + (p.tz || 0)).toLocaleDateString('en-GB', {day: 'numeric', month: short ? 'short' : 'long', year: 'numeric', timeZone: 'UTC'});
+}
+const label = (i, short) => takenOn(P[i], short) || `${SITE.titlePrefix} ${pad(i + 1)}`;
+
+/* cubic-bezier easing (same curves the reference uses) */
+function bez(x1, y1, x2, y2) {
+  const X = u => 3 * (1 - u) ** 2 * u * x1 + 3 * (1 - u) * u * u * x2 + u ** 3;
+  const Y = u => 3 * (1 - u) ** 2 * u * y1 + 3 * (1 - u) * u * u * y2 + u ** 3;
+  return t => { if (t <= 0) return 0; if (t >= 1) return 1; let lo = 0, hi = 1, u = t;
+    for (let i = 0; i < 24; i++) { u = (lo + hi) / 2; X(u) < t ? lo = u : hi = u; } return Y(u); };
+}
+const EASE_A = bez(.8, 0, .1, 1), EASE_B = bez(.72, 0, .11, 1);
+
+// Google's image host sometimes answers 429/5xx under load: retry with back-off.
+document.addEventListener('error', e => {
+  const el = e.target;
+  if (!(el instanceof HTMLImageElement) || !el.src.includes('googleusercontent')) return;
+  const n = +(el.dataset.retry || 0); if (n >= 4) return;
+  el.dataset.retry = n + 1; const src = el.src;
+  setTimeout(() => { el.removeAttribute('src'); el.src = src; }, 800 * (n + 1) + Math.random() * 600);
+}, true);
+
+document.title = SITE.name + ' — Plates';
+const fmt = d => d ? new Date(d).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'}) : '—';
+const syncT = A.updated ? Date.parse(A.updated) : null;
+$('#a-text').innerHTML = SITE.about.map((t, i) => `<p${i ? ' class="ts"' : ''}>${t}</p>`).join('') +
+  (SITE.email ? `<p class="ts"><a href="mailto:${SITE.email}">${SITE.email}</a></p>` : '');
+
+/* =====================================================================
+   state + geometry (mirrors the reference: "in" = hero, "out" = card row)
+   ===================================================================== */
+const body = document.body;
+let view = 'work', mode = 'in', idx = 0, intro = true, titleIdx = -1;
+let lockUntil = 0, transUntil = 0, zTop = 10;
+const win = {w: innerWidth, h: innerHeight};
+// lighter image sizes on phones (hero / card row / intro tiles / sheet)
+const SMALL = Math.min(innerWidth, innerHeight) < 600;
+const HQ = SMALL ? 1280 : 1920, LQ = SMALL ? 640 : 800, TQ = SMALL ? 420 : 800, SQ = SMALL ? 960 : 1280;
+const scroll = {cur: 0, tar: 0};
+let E = 1, IN = {}, OUT = {}, pitch = 1, maxScroll = 0, smW = 76, smH = 43;
+
+function calc() {
+  win.w = innerWidth; win.h = innerHeight;
+  E = win.w / win.h > 1.6 ? win.h / 1000 : win.w / 1600;
+  smW = Math.round(76 * E); smH = Math.round(9 * smW / 16);
+  IN = {x: -1, y: -1, w: win.w + 2, h: win.h + 2};
+  if (win.w < 700 || win.h > win.w * 1.1) {          // phones / portrait
+    OUT = {w: Math.round(win.w * .62), gap: Math.round(win.w * .06)}; OUT.h = Math.round(OUT.w * 1.4);
+  } else if (win.h < 560) {                          // landscape phone: size the cards from the height
+    OUT = {h: Math.round(win.h * .6)}; OUT.w = Math.round(OUT.h * .7); OUT.gap = Math.round(OUT.w * .09);
+  } else {                                           // 350 x 500 cards, 30 gap on a 1600 x 1000 design grid
+    OUT = {w: Math.round(350 * E), h: Math.round(500 * E), gap: Math.round(30 * E)};
+  }
+  if (OUT.h > win.h * .78) { const f = win.h * .78 / OUT.h; OUT.w = Math.round(OUT.w * f); OUT.h = Math.round(OUT.h * f); }
+  OUT.x = (win.w - OUT.w) / 2; OUT.y = (win.h - OUT.h) / 2;
+  pitch = OUT.w + OUT.gap; maxScroll = Math.max(0, pitch * (N - 1));
+}
+calc();
+
+/* ---------- cards ---------- */
+const cardsEl = $('#cards');
+const cards = P.map((p, i) => {
+  const el = document.createElement('div'); el.className = 'card'; el.dataset.i = i;
+  el.innerHTML = `<div class="cm"><img alt="${label(i)}" draggable="false" decoding="async"></div><div class="cap"><span>${label(i, true)}</span><span>${p.w}×${p.h}</span></div>`;
+  cardsEl.appendChild(el);
+  const im = el.querySelector('img'); im.addEventListener('load', () => im.classList.add('ld'));
+  const z = () => ({x: 0, y: 0, w: 0, h: 0, s: 1, o: 0});
+  return {el, im, cur: z(), tar: z(), q: 0, pend: null, last: '', z: 0, shown: false, pan: null, up: false, tw: null};
+});
+function ensure(i, q) {
+  const c = cards[i]; if (!c || c.q >= q) return;
+  if (c.q === 0) { c.q = q; c.im.src = imgUrl(P[i], q); return; }   // nothing on screen yet: just load it
+  if (c.up) return;
+  // Upgrading a card that is already showing a photo: fetch + decode the bigger file off-screen first and only then swap it in,
+  // so the card never goes blank (that blank frame was the flash of blue paper at the end of a zoom-in).
+  c.up = true;
+  const hi = (n) => {
+    const pre = new Image(); pre.referrerPolicy = 'no-referrer'; pre.decoding = 'async';
+    pre.onload = () => {
+      const dec = pre.decode ? pre.decode().catch(() => {}) : Promise.resolve();
+      Promise.race([dec, new Promise(r => setTimeout(r, 1000))]).then(() => { c.im.src = pre.src; c.q = q; c.up = false; });
+    };
+    pre.onerror = () => { if (n < 4) setTimeout(() => hi(n + 1), 800 * (n + 1)); else c.up = false; };
+    pre.src = imgUrl(P[i], q);
+  };
+  hi(0);
+}
+// Hero rectangle: the WHOLE photo, scaled to fit the screen (portrait or landscape) and centred on the blueprint paper.
+// The card has the photo's own aspect ratio, so the image fills it exactly — nothing is cropped.
+function fitRect(i) {
+  const p = P[i], pad = Math.round(Math.min(win.w, win.h) * .045);
+  const k = Math.min((win.w - 2 * pad) / p.w, (win.h - 2 * pad) / p.h);
+  const w = Math.round(p.w * k), h = Math.round(p.h * k);
+  return {x: Math.round((win.w - w) / 2), y: Math.round((win.h - h) / 2), w, h, s: 1, o: 1};
+}
+// s = how much wider the photo is than its card in the row (the pen's object-position pan needs that spare width)
+const PAN_W = 1.6;
+const outRect = i => ({x: OUT.x + pitch * i - scroll.cur, y: OUT.y, w: OUT.w, h: OUT.h, s: PAN_W, o: 1});
+const hiddenRect = i => ({x: i < idx ? 0 : win.w, y: IN.y, w: 0, h: IN.h, s: 1, o: 0});
+
+function snapAll(hideMain) {
+  cards.forEach((c, i) => {
+    const r = mode === 'out' ? outRect(i) : (i === idx ? fitRect(i) : hiddenRect(i));
+    if (hideMain && i === idx) r.o = 0;
+    Object.assign(c.cur, r); Object.assign(c.tar, r); c.pend = null; c.tw = null; c.last = '';
+  });
+  if (mode === 'in') ensure(idx, HQ);
+}
+
+/* ---------- render loop (damped, like the reference's lerp) ---------- */
+let lastT = performance.now(), pgnIdx = -1;
+const KEYS = ['x', 'y', 'w', 'h', 's', 'o'];
+function frame(now) {
+  const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
+  scroll.cur += (scroll.tar - scroll.cur) * (1 - Math.exp(-dt * 6));
+  if (Math.abs(scroll.tar - scroll.cur) < .05) scroll.cur = scroll.tar;
+  const kS = 1 - Math.exp(-dt * 8.5), kF = 1 - Math.exp(-dt * 14), kP = 1 - Math.exp(-dt * 3.2);
+  const settled = mode === 'out' && now > transUntil;
+  const margin = win.w * .6;
+  for (let i = 0; i < cards.length; i++) {
+    const c = cards[i], r = c.cur, t = c.tar;
+    if (c.pend && now >= c.pend.t) { Object.assign(t, c.pend.props); c.pend = null; }
+    if (mode === 'out') t.x = OUT.x + pitch * i - scroll.cur;
+    if (c.tw) {                                    // timed horizontal slide (plate -> plate)
+      const tw = c.tw, pr = clamp((now - tw.t0) / tw.dur, 0, 1);
+      r.x = lerp(tw.from, tw.to, tw.ease(pr)); t.x = tw.to;
+      if (pr >= 1) { c.tw = null; if (tw.done) tw.done(); }
+    }
+    for (let k = 0; k < 6; k++) {
+      const p = KEYS[k], d = t[p] - r[p];
+      if (d === 0 || (p === 'x' && c.tw)) continue;
+      const kk = (p === 'x' && settled) ? kF : kS;
+      r[p] += d * kk;
+      // snap once the remaining distance is imperceptible, so the tail of a transition ends instead of crawling pixel by pixel
+      if (Math.abs(d) < (p === 'o' ? .01 : p === 's' ? .006 : .7)) r[p] = t[p];
+    }
+    const vis = r.o > .01 && r.w > .5 && r.h > .5 && r.x < win.w + margin && r.x + r.w > -margin;
+    if (!vis) { if (c.shown) { c.el.style.display = 'none'; c.shown = false; } continue; }
+    if (!c.shown) { c.el.style.display = 'block'; c.shown = true; c.last = ''; }
+    if (c.q === 0) ensure(i, r.w > win.w * .6 ? HQ : LQ);
+    // Sliding-Image-Track pan: the photo is wider than its card and its "object-position" runs from 100% (card at the
+    // right edge of the screen) to 0% (card at the left edge) - and trails behind the card (the pen's 1200ms animation).
+    const want = clamp((r.x + r.w / 2) / win.w, 0, 1);
+    c.pan = c.pan === null ? want : c.pan + (want - c.pan) * kP;
+    const extra = Math.max(0, r.s - 1) * r.w, shift = -extra * c.pan;
+    const key = r.x.toFixed(1) + '|' + r.y.toFixed(1) + '|' + r.w.toFixed(1) + '|' + r.h.toFixed(1) + '|' + r.s.toFixed(3) + '|' + r.o.toFixed(2) + '|' + shift.toFixed(1) + '|' + c.z;
+    if (key !== c.last) {
+      c.last = key;
+      c.el.style.transform = `translate3d(${r.x.toFixed(2)}px,${r.y.toFixed(2)}px,0)`;
+      c.el.style.width = r.w.toFixed(2) + 'px'; c.el.style.height = r.h.toFixed(2) + 'px';
+      c.el.style.opacity = r.o.toFixed(3); c.el.style.zIndex = c.z;
+      c.im.style.width = (r.w + extra).toFixed(2) + 'px'; c.im.style.height = r.h.toFixed(2) + 'px';
+      c.im.style.transform = `translate3d(${shift.toFixed(2)}px,0,0)`;
+    }
+  }
+  if (mode === 'out' && !intro) {
+    const ci = clamp(Math.round(scroll.cur / pitch), 0, N - 1);
+    if (ci !== pgnIdx) { pgnIdx = ci; setPgn(ci); }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- UI helpers ---------- */
+const thumbsIn = $('#thumbs-in');
+thumbsIn.innerHTML = P.map((p, i) => `<button aria-label="${label(i)}"><img loading="lazy" alt="" src="${p.url}=w96-h64-c"></button>`).join('');
+const thumbBtns = [...thumbsIn.children];
+thumbsIn.addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(thumbBtns.indexOf(b)); });
+
+const pgnEl = $('#pgn');
+pgnEl.innerHTML = `<span class="pg-n" style="width:${String(N).length}ch"><span class="pg-col">${P.map((_, k) => `<i>${k + 1}</i>`).join('')}</span></span><span class="pg-mid">—</span><span class="pg-t">${N}</span>`;
+const pgnCol = pgnEl.querySelector('.pg-col');
+function setPgn(i) {
+  pgnCol.style.transform = `translateY(${-i * 20}px)`;
+  $('#sn').textContent = `${pad(i + 1)} / ${pad(N)}`;
+}
+function updateUI() {
+  setPgn(idx);
+  thumbBtns.forEach((b, k) => b.classList.toggle('on', k === idx));
+  const box = $('#thumbs').clientWidth || 340;
+  thumbsIn.style.transform = `translateX(${box / 2 - (idx * 44 + 19)}px)`;
+}
+function showTitle(i, delay) {
+  const w = $('#title-w'), old = w.querySelector('.t:not(.t-out)');
+  if (old) { old.classList.add('t-out'); setTimeout(() => old.remove(), 1000); }
+  const el = document.createElement('div'); el.className = 't t-in';
+  el.innerHTML = `<span>${label(i)}</span><sup>${P[i].w}×${P[i].h}</sup>`;
+  el.addEventListener('click', () => { location.hash = '#sheet'; });
+  w.appendChild(el); titleIdx = i;
+  setTimeout(() => el.classList.remove('t-in'), Math.max(delay, 30));
+}
+function hideTitle() {
+  const old = $('#title-w').querySelector('.t:not(.t-out)');
+  if (old) { old.classList.add('t-out'); setTimeout(() => old.remove(), 1000); }
+  titleIdx = -1;
+}
+let crossR = 0;
+function spinCross(dir) {
+  crossR += 90 * dir;
+  $('#cx1').style.setProperty('--r', crossR + 'deg'); $('#cx2').style.setProperty('--r', crossR + 'deg');
+}
+function thumbRect(i) {
+  const b = thumbBtns[i];
+  if (b && win.w >= 900) {
+    const r = b.getBoundingClientRect(), s = $('#thumbs').getBoundingClientRect(), w = r.width || 38, h = r.height || 26;
+    return {x: clamp(r.left, s.left - w * .3, s.right - w * .7), y: clamp(r.top, 0, win.h), w, h};
+  }
+  return {x: win.w - 40 - smW, y: win.h - 40 - smH, w: smW, h: smH};
+}
+const centerIdx = () => clamp(Math.round(scroll.cur / pitch), 0, N - 1);
+
+/* ---------- hero <-> card-row transitions ---------- */
+function toOut() {
+  if (mode === 'out' || intro || performance.now() < lockUntil || !N) return;
+  const now = performance.now(); lockUntil = now + 1300; transUntil = now + 1400;
+  mode = 'out'; body.dataset.mode = 'out';
+  scroll.cur = scroll.tar = clamp(pitch * idx, 0, maxScroll);
+  hideTitle(); pgnIdx = -1;
+  cards.forEach((c, i) => {
+    const o = outRect(i); c.tw = null;
+    if (i === idx) { c.tar = Object.assign({}, o); c.z = zTop; return; }
+    // neighbours unfold out of the centre card (collapsed against the side that faces it)
+    c.cur = {x: i < idx ? o.x + o.w : o.x, y: o.y, w: 0, h: o.h, s: PAN_W, o: 1};
+    c.tar = Object.assign({}, c.cur); c.z = 1;
+    c.pend = {t: now + 40 * Math.abs(i - idx), props: {x: o.x, w: o.w}};
+  });
+}
+function toIn(i) {
+  if (mode === 'in' || intro || performance.now() < lockUntil) return;
+  const now = performance.now(); lockUntil = now + 1300;
+  mode = 'in'; body.dataset.mode = 'in'; idx = i; updateUI();
+  ensure(i, HQ);
+  cards.forEach((c, k) => {
+    c.tw = null;
+    if (k === i) { c.tar = fitRect(i); c.z = ++zTop; return; }
+    c.z = 1; const h = hiddenRect(k);
+    c.pend = {t: now + 40 * Math.abs(k - i), props: h};
+  });
+  showTitle(i, 240);
+}
+/* Plate -> plate: a horizontal scroll. The new photo enters from the side at full size while the old one leaves the other way;
+   the screen edge crops both (nothing is scaled). Fixed duration + ease-in-out, so it reads as a deliberate glide, not a lurch. */
+const EASE_SLIDE = bez(.645, .045, .355, 1), SLIDE_MS = 1500;
+function go(n) {
+  if (mode !== 'in' || intro || !N) return;
+  const raw = n; n = (n + N) % N; const now = performance.now();
+  if (n === idx || now < lockUntil) return;
+  lockUntil = now + 600;
+  const old = idx, dir = raw > old ? 1 : -1; idx = n;          // next => new photo from the right, old one scrolls off to the left
+  const cN = cards[n], cO = cards[old];
+  ensure(n, HQ);
+  spinCross(dir); showTitle(n, 300); updateUI();
+  [n + 1, n - 1].forEach(m => { const q = P[(m + N) % N]; if (q) { const pre = new Image(); pre.referrerPolicy = 'no-referrer'; pre.src = imgUrl(q, HQ); } });
+  const begin = () => {
+    const t0 = performance.now(), W = win.w;
+    const fr = fitRect(n);
+    cN.cur = {x: dir * W, y: fr.y, w: fr.w, h: fr.h, s: 1, o: 1}; cN.tar = fr; cN.pend = null; cN.z = ++zTop;
+    cN.tw = {t0, dur: SLIDE_MS, from: dir * W, to: fr.x, ease: EASE_SLIDE};
+    cO.pend = null; cO.z = zTop - 1;
+    cO.tw = {t0, dur: SLIDE_MS, from: cO.cur.x, to: -dir * W, ease: EASE_SLIDE, done: () => { cO.cur.o = cO.tar.o = 0; }};
+  };
+  // start sliding once the incoming photo is ready, so an empty frame never scrolls in (max 700ms wait)
+  const im = cN.im;
+  if (im.complete && im.naturalWidth) begin();
+  else { let fired = false; const once = () => { if (!fired) { fired = true; begin(); } }; im.addEventListener('load', once, {once: true}); setTimeout(once, 700); }
+}
+function syncStage() {            // back from Sheet: put the hero on the right plate without animating
+  snapAll(false); updateUI();
+  if (mode === 'in' && titleIdx !== idx) showTitle(idx, 0);
+}
+
+/* =====================================================================
+   opening animation — reproduces the reference's WebGL intro in DOM:
+   a 5x5 grid of tiles, columns alternately sliding up / down, then the
+   centre tile zooms to fill the screen while the rest fly off to the sides;
+   thumbs rise, title / crosses / pagination / nav arrive in a stagger.
+   ===================================================================== */
+const introEl = $('#intro');
+const tiles = [];
+function buildTiles() {
+  for (let t = 0; t < 25; t++) {
+    const main = t === 12;
+    const photo = main ? P[0] : P[(t < 12 ? t + 1 : t) % N];
+    const el = document.createElement('div'); el.className = 'tile';
+    el.innerHTML = '<div class="cm"><img alt="" draggable="false" decoding="async"></div>';
+    const im = el.querySelector('img'); im.addEventListener('load', () => { im.classList.add('ld'); tileLoaded++; });
+    im.src = imgUrl(photo, main ? HQ : TQ);
+    el.style.visibility = 'hidden';
+    introEl.appendChild(el); tiles.push({el, im, main});
+  }
+}
+let tileLoaded = 0;
+
+function introGeometry() {
+  const e = win.w, i = win.h, S = 30 * E;
+  const r = (e - 4 * S) / 4, a = r * i / e, h = a + S, l = r + S, o = .5 * h;
+  const n = i + .5 * (5 * a + 4 * S - i), p = 12 * a;
+  // the centre tile zooms to the hero's fitted rectangle (d x c); the zoom-grid pitch stays >= the screen so the other tiles end off-screen
+  const fr = fitRect(0), d = fr.w, c = fr.h, dd = Math.max(d, e + 2), cc = Math.max(c, i + 2);
+  const S2 = S * dd / r, g = cc + S2, u = dd + S2;
+  return tiles.map((_, t) => {
+    const v0 = Math.floor(t / 5), f = v0 % 2 === 1, v = v0 - 2, R = Math.abs(v), x = t % 5, w = x - 2;
+    const yOff = f ? -(n - o + (4 - x) * p + R * a + 20) : n + x * p + R * a + 20;
+    const zx = .5 * (e - d) + v * u, zy = .5 * (i - c) + w * g - (f ? .5 * g : 0);
+    const gx = .5 * (e - r) + v * l, gy = .5 * (i - a) + w * h - (f ? o : 0);
+    return {zx, zy, d, c, dx: gx - zx, dy: gy - zy, dw: r - d, dh: a - c, sc: t === 12 ? .5 : 0, yOff};
+  });
+}
+function paintTile(tl, g, e1, i1) {
+  const x = g.zx + lerp(g.dx, 0, i1), y = g.zy + lerp(g.dy, 0, i1) + lerp(g.yOff, 0, e1);
+  const w = g.d + lerp(g.dw, 0, i1), h = g.c + lerp(g.dh, 0, i1), s = 1 + lerp(g.sc, 0, i1);
+  const vis = x < win.w && x + w > 0 && y < win.h && y + h > 0;
+  tl.el.style.visibility = vis ? 'visible' : 'hidden';
+  if (!vis) return;
+  tl.el.style.transform = `translate3d(${x.toFixed(2)}px,${y.toFixed(2)}px,0)`;
+  tl.el.style.width = w.toFixed(2) + 'px'; tl.el.style.height = h.toFixed(2) + 'px';
+  tl.im.style.transform = `scale(${s.toFixed(4)})`;
+}
+let started = false;
+function startIntro() {
+  if (started) return; started = true;
+  const D = FAST ? 1 : 5000, T = ms => FAST ? 0 : ms;
+  const geo = introGeometry();
+  $('#loader').classList.add('go');                       // counter card slides up, paper shows through
+  setTimeout(() => $('#loader').classList.add('off'), 1100);
+  const t0 = performance.now();
+  function step(now) {
+    const p = clamp((now - t0) / D, 0, 1);
+    const e1 = EASE_A(iLerp(0, .65, p)), i1 = EASE_B(iLerp(.4, 1, p));
+    tiles.forEach((tl, k) => paintTile(tl, geo[k], e1, i1));
+    if (p < 1) requestAnimationFrame(step); else finishIntro();
+  }
+  requestAnimationFrame(step);
+
+  // staggered page entrance (delays taken from the reference)
+  thumbBtns.forEach((b, k) => { b.style.transitionDelay = `0s,0s,${T(3200 + 50 * Math.min(Math.abs(k - idx), 8))}ms`; });
+  setTimeout(() => body.classList.add('s-thumbs'), T(60));
+  showTitle(idx, T(3200));
+  setTimeout(() => body.classList.add('s-cross'), T(3500));
+  setTimeout(() => body.classList.add('ready'), T(3800));
+  setTimeout(() => thumbBtns.forEach(b => b.style.transitionDelay = ''), T(6000));
+}
+function finishIntro() {
+  const c = cards[0];
+  Object.assign(c.cur, fitRect(0)); Object.assign(c.tar, fitRect(0)); c.z = ++zTop; c.last = '';
+  ensure(0, HQ);
+  const done = () => setTimeout(() => { introEl.remove(); tiles.length = 0; }, 750);
+  c.im.complete && c.im.naturalWidth ? (c.im.classList.add('ld'), done()) : c.im.addEventListener('load', done, {once: true});
+  intro = false; body.classList.remove('introing'); updateUI();
+}
+
+/* loader: counts the 25 intro textures, then hands over to the intro */
+let pct = 0, ready = false;
+(function tickLoader() {
+  const target = ready ? 100 : Math.min(94, tileLoaded / 25 * 100);
+  pct += (target - pct) * .08;
+  const v = Math.round(pct);
+  $('#ld-n').textContent = v + '%'; $('#ld-b').style.width = v + '%';
+  if (!started) requestAnimationFrame(tickLoader);
+})();
+const tLoad0 = performance.now();
+function checkReady() {
+  if (started) return;
+  const m = tiles[12] && tiles[12].im, mainOK = m && m.complete && m.naturalWidth;
+  const waited = performance.now() - tLoad0;
+  if ((mainOK && (tileLoaded >= 22 || waited > 7000)) || waited > 14000) {
+    ready = true; $('#ld-n').textContent = '100%'; $('#ld-b').style.width = '100%';
+    setTimeout(startIntro, 450);
+  } else setTimeout(checkReady, 250);
+}
+
+/* =====================================================================
+   sheet (project-style page) + about + routing
+   ===================================================================== */
+let sheetBuilt = false;
+function buildSheet() {
+  if (sheetBuilt) return; sheetBuilt = true;
+  $('#sheet').innerHTML =
+    `<div class="s-head"><h1>${SITE.titlePrefix}s</h1><p>${N} drawings · synced ${fmt(syncT)}</p></div>` +
+    P.map((p, i) => {
+      const port = p.h > p.w, g = gcd(p.w, p.h);
+      return `<figure class="fig ${port ? 'port' : 'land'}" id="f${i}" data-i="${i}">
+        <div class="dim-x"><b>${p.w} PX</b></div><div class="dim-y"><b>${p.h} PX</b></div>
+        <div class="ph" style="aspect-ratio:${p.w}/${p.h}"><img loading="lazy" decoding="async" alt="${label(i)}" src="${imgUrl(p, SQ)}"></div>
+        <figcaption><span>${label(i, true)}</span><span>${p.w}×${p.h}</span><span>${p.w / g}:${p.h / g}</span></figcaption></figure>`;
+    }).join('') + `<div class="s-end"><a href="#">Back to Work</a></div>`;
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) e.target.classList.add('in'); }), {root: $('#sheet'), threshold: .08});
+  const io2 = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting && view === 'sheet') { idx = +e.target.dataset.i; setPgn(idx); }
+  }), {root: $('#sheet'), rootMargin: '-45% 0px -45% 0px'});
+  $('#sheet').querySelectorAll('.fig').forEach(f => { io.observe(f); io2.observe(f); });
+}
+function route() {
+  const h = location.hash, prev = view;
+  view = h === '#sheet' ? 'sheet' : h === '#about' ? 'about' : 'work';
+  body.dataset.view = view;
+  $('#n-work').classList.toggle('on', view !== 'about');
+  $('#n-about').classList.toggle('on', view === 'about');
+  if (view === 'sheet') {
+    buildSheet();
+    const f = $('#f' + idx);
+    if (f) { f.classList.add('in'); $('#sheet').scrollTop = idx === 0 ? 0 : f.offsetTop - ($('#sheet').clientHeight - f.offsetHeight) / 2; }
+  } else if (view === 'work' && prev === 'sheet' && !intro) {
+    if (mode === 'out') { mode = 'in'; body.dataset.mode = 'in'; }
+    syncStage();
+  }
+}
+addEventListener('hashchange', route);
+$('#n-work').addEventListener('click', e => {
+  if (view === 'work' && !intro) { e.preventDefault(); mode === 'in' ? toOut() : toIn(centerIdx()); }
+});
+$('#idxbtn').addEventListener('click', () => {
+  if (view === 'work' && !intro) mode === 'in' ? toOut() : toIn(centerIdx());
+});
+$('#cx1').onclick = () => go(idx - 1);
+$('#cx2').onclick = () => go(idx + 1);
+
+/* ---------- input ---------- */
+let wheelLock = 0;
+addEventListener('wheel', e => {
+  if (view !== 'work' || intro) return;
+  const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (mode === 'in') {                                   // scrolling the hero opens the card row (as on the reference)
+    const now = performance.now();
+    if (now < wheelLock || now < lockUntil || Math.abs(d) < 8) return;
+    wheelLock = now + 1200; toOut();
+  } else scroll.tar = clamp(scroll.tar + d * 1.1, 0, maxScroll);
+}, {passive: true});
+
+addEventListener('keydown', e => {
+  if (view === 'work' && !intro) {
+    if (mode === 'in') {
+      if (e.key === 'ArrowRight') go(idx + 1);
+      else if (e.key === 'ArrowLeft') go(idx - 1);
+      else if (['ArrowDown', 'ArrowUp', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); toOut(); }
+      else if (e.key === 'Enter') location.hash = '#sheet';
+    } else {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); scroll.tar = clamp((Math.round(scroll.tar / pitch) + 1) * pitch, 0, maxScroll); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); scroll.tar = clamp((Math.round(scroll.tar / pitch) - 1) * pitch, 0, maxScroll); }
+      else if (e.key === 'Enter' || e.key === 'Escape') toIn(centerIdx());
+    }
+  } else if (e.key === 'Escape' && view !== 'work') location.hash = '';
+  if (e.key === 'b' || e.key === 'B') $('#tog').click();
+});
+
+/* drag the card row (the SlidingImages mechanic: pointer delta -> track offset, images pan inside their frames) */
+let drag = null;
+cardsEl.addEventListener('pointerdown', e => {
+  if (intro || view !== 'work' || e.button > 0) return;
+  const card = e.target.closest && e.target.closest('.card');
+  drag = {x: e.clientX, y: e.clientY, s: scroll.tar, moved: false, i: card ? +card.dataset.i : null};
+  try { cardsEl.setPointerCapture(e.pointerId); } catch (_) {}
+});
+cardsEl.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) > 6) drag.moved = true;
+  if (mode === 'out' && drag.moved) { body.classList.add('dragging'); scroll.tar = clamp(drag.s - dx * 1.4, 0, maxScroll); }
+});
+const endDrag = (e, cancel) => {
+  if (!drag) return; const d = drag; drag = null; body.classList.remove('dragging');
+  if (cancel) return;
+  const dx = e.clientX - d.x, dy = e.clientY - d.y;
+  if (!d.moved) {
+    if (mode === 'out') { if (d.i != null) toIn(d.i); }
+    else go(e.clientX > win.w / 2 ? idx + 1 : idx - 1);
+  } else if (mode === 'in') {
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) go(idx + (dx < 0 ? 1 : -1));
+    else if (Math.abs(dy) > 50) toOut();
+  }
+};
+cardsEl.addEventListener('pointerup', e => endDrag(e, false));
+cardsEl.addEventListener('pointercancel', e => endDrag(e, true));
+
+$('#tog').onclick = () => {
+  const c = body.classList.toggle('clean');
+  $('#tog').textContent = 'Blueprint ● ' + (c ? 'off' : 'on');
+  try { localStorage.setItem('bp-clean', c ? '1' : '0'); } catch (_) {}
+};
+try { if (localStorage.getItem('bp-clean') === '1') $('#tog').click(); } catch (_) {}
+
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { calc(); if (!intro) { scroll.tar = scroll.cur = clamp(scroll.cur, 0, maxScroll); snapAll(false); } }, 120); });
+
+/* the album is re-pulled server-side every 24h (serve.ps1 / scheduled sync);
+   reload when the tab comes back after a day so it picks up the fresh photos.js */
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - loadedAt > SYNC_MS) location.reload();
+});
+
+/* ---------- start ---------- */
+if (!N) {
+  $('#empty').style.display = 'grid'; $('#loader').classList.add('off'); intro = false;
+  body.classList.remove('introing'); body.classList.add('ready', 's-cross', 's-thumbs');
+} else {
+  snapAll(true);                 // hero plate waits (hidden) until the intro hands over to it
+  buildTiles(); updateUI();
+  requestAnimationFrame(frame);
+  checkReady();
+}
+route();
+</script>
+</body>
+</html>
