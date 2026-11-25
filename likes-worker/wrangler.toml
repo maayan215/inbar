@@ -1,0 +1,12 @@
+name = "inbar-likes"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+
+# served at https://likes.inbarviente.com (Cloudflare creates the DNS record for it)
+routes = [
+  { pattern = "likes.inbarviente.com", custom_domain = true }
+]
+
+[[kv_namespaces]]
+binding = "LIKES"
+id = "e0b2efff945645b0a874ea9a6c2949b9"

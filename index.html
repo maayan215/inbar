@@ -196,6 +196,22 @@ body.clean .fig .ph::after{opacity:0}
 #loader .pc{display:flex;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid #0b0b0b;font:500 11px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase}
 #loader .bar{height:3px;background:rgba(0,0,0,.15);margin-top:8px}#loader .bar i{display:block;height:100%;width:0;background:#0b0b0b}
 #empty{position:fixed;inset:0;z-index:12;display:none;place-items:center;text-align:center;font:400 12px/1.7 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+/* ---------- likes ---------- */
+/* heart button under the title in the zoomed-in view (shown once the likes counter answers) */
+#likebtn{position:fixed;z-index:12;left:50%;top:calc(50% - 1.6vw + 1.3 * clamp(28px,3.125vw,60px) + 14px);transform:translateX(-50%);
+  display:none;align-items:center;gap:8px;padding:7px 14px 7px 11px;border:1px solid var(--edge);background:rgba(10,42,107,.35);
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);font:500 12px/1 var(--mono);letter-spacing:.06em;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .5s var(--o2),background .25s}
+body.likes-on #likebtn{display:flex}
+body.likes-on.ready[data-view="work"][data-mode="in"]:not(.introing) #likebtn{opacity:1;pointer-events:all}
+#likebtn:hover{background:rgba(10,42,107,.65)}
+#likebtn svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:1.8;transition:fill .2s}
+#likebtn.on svg{fill:#fff}
+#likebtn.pop svg{animation:likepop .45s var(--o5)}
+@keyframes likepop{0%{transform:scale(1)}40%{transform:scale(1.45)}100%{transform:scale(1)}}
+/* count in each card's caption in the zoomed-out row */
+.cap .lk{display:none} body.likes-on .cap .lk{display:inline} .cap .lk.zero{opacity:.45}
+
 /* ---------- phones / touch ---------- */
 *{-webkit-tap-highlight-color:transparent}
 .ov{overscroll-behavior:contain}
@@ -244,6 +260,7 @@ body:not([data-view="work"]) #idxbtn{opacity:0;pointer-events:none}
 <a id="back" href="#">Back</a>
 <div id="sn"></div>
 <div id="pgn"></div>
+<button id="likebtn" type="button" aria-pressed="false" aria-label="Like this photo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.6l-1.3-1.2C5.6 14.8 2.5 12 2.5 8.6 2.5 5.8 4.7 3.7 7.4 3.7c1.6 0 3.4.8 4.6 2.3 1.2-1.5 3-2.3 4.6-2.3 2.7 0 4.9 2.1 4.9 4.9 0 3.4-3.1 6.2-8.2 10.8L12 20.6z"/></svg><span class="n">0</span></button>
 <button id="idxbtn" type="button" aria-label="Toggle plate index"><span class="a">Index</span><span class="b">Close</span></button>
 <div id="thumbs"><div id="thumbs-in"></div></div>
 
@@ -374,7 +391,7 @@ calc();
 const cardsEl = $('#cards');
 const cards = P.map((p, i) => {
   const el = document.createElement('div'); el.className = 'card'; el.dataset.i = i;
-  el.innerHTML = `<div class="cm"><img alt="${label(i)}" draggable="false" decoding="async"></div><div class="cap"><span>${label(i, true)}</span><span>${p.w}×${p.h}</span></div>`;
+  el.innerHTML = `<div class="cm"><img alt="${label(i)}" draggable="false" decoding="async"></div><div class="cap"><span>${label(i, true)}</span><span class="lk"></span><span>${p.w}×${p.h}</span></div>`;
   cardsEl.appendChild(el);
   const im = el.querySelector('img'); im.addEventListener('load', () => im.classList.add('ld'));
   const z = () => ({x: 0, y: 0, w: 0, h: 0, s: 1, o: 0});
@@ -491,6 +508,7 @@ function updateUI() {
   thumbBtns.forEach((b, k) => b.classList.toggle('on', k === idx));
   const box = $('#thumbs').clientWidth || 340;
   thumbsIn.style.transform = `translateX(${box / 2 - (idx * 44 + 19)}px)`;
+  renderLikes();
 }
 function showTitle(i, delay) {
   const w = $('#title-w'), old = w.querySelector('.t:not(.t-out)');
@@ -753,6 +771,7 @@ addEventListener('keydown', e => {
     }
   } else if (e.key === 'Escape' && view !== 'work') location.hash = '';
   if (e.key === 'b' || e.key === 'B') $('#tog').click();
+  if ((e.key === 'l' || e.key === 'L') && view === 'work' && mode === 'in' && !intro && likesOn) toggleLike(idx);
 });
 
 /* drag the card row (the SlidingImages mechanic: pointer delta -> track offset, images pan inside their frames) */
@@ -798,6 +817,68 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() 
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && Date.now() - loadedAt > SYNC_MS) location.reload();
 });
+
+/* =====================================================================
+   likes — counter lives in a Cloudflare Worker (likes-worker/), one like per visitor, tap again to undo
+   ===================================================================== */
+const LIKES_API = 'https://likes.inbarviente.com';
+let likeCounts = {}, likesOn = false;
+const likeBtn = $('#likebtn');
+let visitor = '';
+let likedSet = new Set();
+try { likedSet = new Set(JSON.parse(localStorage.getItem('lk-liked') || '[]')); } catch (_) {}
+try { visitor = localStorage.getItem('lk-visitor') || ''; } catch (_) {}
+if (!/^[a-z0-9]{16,40}$/.test(visitor)) {
+  visitor = Array.from(crypto.getRandomValues(new Uint8Array(24)), b => (b % 36).toString(36)).join('');
+  try { localStorage.setItem('lk-visitor', visitor); } catch (_) {}
+}
+const saveLiked = () => { try { localStorage.setItem('lk-liked', JSON.stringify([...likedSet])); } catch (_) {} };
+
+function renderLikes() {
+  if (!likesOn || !N) return;
+  const id = P[idx].id, n = likeCounts[id] || 0, on = likedSet.has(id);
+  likeBtn.querySelector('.n').textContent = n;
+  likeBtn.classList.toggle('on', on);
+  likeBtn.setAttribute('aria-pressed', on);
+  likeBtn.setAttribute('aria-label', on ? 'Unlike this photo' : 'Like this photo');
+  cards.forEach((c, i) => {
+    const el = c.el.querySelector('.lk'); if (!el) return;
+    const k = likeCounts[P[i].id] || 0, t = (likedSet.has(P[i].id) ? '♥ ' : '♡ ') + k;
+    if (el.textContent !== t) el.textContent = t;
+    el.classList.toggle('zero', k === 0);
+  });
+}
+async function loadLikes() {
+  try {
+    const r = await fetch(LIKES_API + '/likes', {cache: 'no-store'});
+    if (!r.ok) throw new Error(r.status);
+    likeCounts = (await r.json()).counts || {};
+    if (!likesOn) { likesOn = true; body.classList.add('likes-on'); }
+    renderLikes();
+  } catch (_) { /* counter unreachable: keep the button hidden, the rest of the site works as before */ }
+}
+async function toggleLike(i) {
+  const id = P[i].id, now = !likedSet.has(id), before = likeCounts[id] || 0;
+  // update instantly, then confirm with the server
+  now ? likedSet.add(id) : likedSet.delete(id); saveLiked();
+  likeCounts[id] = Math.max(0, before + (now ? 1 : -1));
+  likeBtn.classList.remove('pop'); void likeBtn.offsetWidth; if (now) likeBtn.classList.add('pop');
+  renderLikes();
+  try {
+    const r = await fetch(LIKES_API + '/like', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, visitor, liked: now})});
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    likeCounts[id] = d.count;
+    d.liked ? likedSet.add(id) : likedSet.delete(id); saveLiked();
+  } catch (_) {   // failed: undo the optimistic change
+    now ? likedSet.delete(id) : likedSet.add(id); saveLiked();
+    likeCounts[id] = before;
+  }
+  renderLikes();
+}
+likeBtn.addEventListener('click', e => { e.stopPropagation(); if (view === 'work' && mode === 'in' && !intro) toggleLike(idx); });
+loadLikes();
+setInterval(() => { if (!document.hidden) loadLikes(); }, 90 * 1000);   // pick up other visitors' likes
 
 /* ---------- start ---------- */
 if (!N) {
