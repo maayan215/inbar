@@ -1,2 +1,6 @@
 # private: the Google Photos share link (GitHub gets it as the ALBUM_URL secret instead)
 album-url.txt
+
+# local tooling
+node_modules/
+.wrangler/
