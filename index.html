@@ -8,7 +8,7 @@
 <link rel="icon" href="assets/logo-black.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500&family=Inter+Tight:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
   --bp:#0f3c91; --bp-d:#0a2a6b; --ink:#eef4ff; --mute:#9db8ea; --paper:#f3efe4;
@@ -127,7 +127,11 @@ body:not([data-view="work"]) #cards{visibility:hidden;transition:visibility 0s .
 body[data-mode="out"] #pgn{opacity:1}
 
 /* ---------- overlays ---------- */
-.ov{position:fixed;inset:0;z-index:50;overflow-y:auto;overflow-x:hidden;opacity:0;visibility:hidden;transition:opacity .6s var(--o2),visibility 0s .6s;scrollbar-width:none}
+/* scrolling pages live INSIDE the white frame (inset 16px), and text fades out before it reaches the top links */
+.ov{position:fixed;inset:16px;z-index:50;overflow-y:auto;overflow-x:hidden;opacity:0;visibility:hidden;transition:opacity .6s var(--o2),visibility 0s .6s;scrollbar-width:none;
+  background-attachment:fixed;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,transparent 46px,#000 92px,#000 calc(100% - 40px),transparent 100%);
+          mask-image:linear-gradient(to bottom,transparent 0,transparent 46px,#000 92px,#000 calc(100% - 40px),transparent 100%)}
 .ov::-webkit-scrollbar{display:none}
 body[data-view="sheet"] #sheet,body[data-view="about"] #about{opacity:1;visibility:visible;transition:opacity .6s var(--o2)}
 #back{position:fixed;z-index:95;top:37px;left:40px;opacity:0;pointer-events:none;transition:opacity .4s}
@@ -169,6 +173,12 @@ body.clean .fig .ph::after{opacity:0}
 #about .r p+p{margin-top:2.2em}
 #about .r .ts{font-size:clamp(14px,1.25vw,22px);line-height:1.5;color:var(--mute);letter-spacing:-.01em}
 #about .r .ts a{color:var(--ink);transition:opacity .3s}#about .r .ts a:hover{opacity:.5}
+#about .r .contact{margin-top:2.2em;font-family:var(--mono);font-size:clamp(12px,.95vw,16px);letter-spacing:.04em;display:flex;flex-wrap:wrap;gap:.4em .9em;align-items:baseline}
+#about .r .contact .lbl{color:var(--mute);text-transform:uppercase;letter-spacing:.08em;margin-right:.6em}
+#about .r .contact .sep{color:var(--mute)}
+/* Hebrew version: right-to-left, separated by a blueprint rule */
+#about .r .he{margin-top:3.2em;padding-top:2.4em;border-top:1px solid var(--edge);font-family:"Heebo",var(--sans);letter-spacing:0}
+#about .r .he p+p{margin-top:1.6em}
 #about .logo{display:block;width:min(360px,100%);height:auto;margin:0 0 22px;pointer-events:none;-webkit-user-drag:none}
 /* blueprint on/off switch (lives on the About page) */
 #tog{display:inline-block;padding:11px 18px;border:1px solid var(--edge);font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;transition:background .25s,color .25s}
@@ -258,13 +268,21 @@ body:not([data-view="work"]) #idxbtn{opacity:0;pointer-events:none}
 <script>
 /* ===== edit these ===== */
 const SITE = {
-  name: 'Inbar',
+  name: 'Inbar Viente',
   titlePrefix: 'Plate',          // slide title: "Plate 01"
+  // About page — first paragraph is set large, the rest smaller
   about: [
-    'Selected work — drawn, photographed and built. Replace this paragraph with a few lines about you.',
-    'Add more paragraphs here. This text lives in the SITE object at the top of index.html.'
+    'I’m Inbar Viente, and my background is in building things. I have a strong foundation in mathematics and physics, I program in C and work in Figma and Photoshop. In high school I was the head integrator of my FIRST Robotics Competition (FRC) team, where I designed and built robot mechanisms.',
+    'Photography is my hobby. I shoot the everyday — city streets at dusk, signs, street art and the small, odd details most people walk past — whenever something catches my eye.',
+    'I’m currently serving in a technical role. The photographs on this site come straight from my album and are refreshed every day.'
   ],
-  email: ''                       // e.g. 'hello@example.com' (hidden when empty)
+  aboutHe: [
+    'אני ענבר, והרקע שלי הוא בבנייה של דברים. יש לי בסיס חזק במתמטיקה ובפיזיקה, אני מתכנתת בשפת C ועובדת ב-Figma וב-Photoshop. בתיכון הייתי ראש צוות האינטגרציה בקבוצת ה-FRC שלי, שבה תכננתי ובניתי מכלולים לרובוט.',
+    'צילום הוא התחביב שלי. אני מצלמת את היומיום — רחובות בשעת דמדומים, שלטים, אמנות רחוב והפרטים הקטנים והמוזרים שרוב האנשים עוברים לידם בלי לשים לב — בכל פעם שמשהו תופס לי את העין.',
+    'כיום אני משרתת בתפקיד טכני. התמונות באתר מגיעות ישירות מהאלבום שלי ומתעדכנות מדי יום.'
+  ],
+  email: 'inbar.viente@gmail.com',   // hidden when empty
+  phone: '058-774-8788'              // hidden when empty
 };
 /* ====================== */
 
@@ -309,8 +327,16 @@ document.addEventListener('error', e => {
 document.title = SITE.name + ' — Plates';
 const fmt = d => d ? new Date(d).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'}) : '—';
 const syncT = A.updated ? Date.parse(A.updated) : null;
-$('#a-text').innerHTML = SITE.about.map((t, i) => `<p${i ? ' class="ts"' : ''}>${t}</p>`).join('') +
-  (SITE.email ? `<p class="ts"><a href="mailto:${SITE.email}">${SITE.email}</a></p>` : '');
+{
+  const paras = arr => (arr || []).map((t, i) => `<p${i ? ' class="ts"' : ''}>${t}</p>`).join('');
+  const contact = [
+    SITE.email ? `<a href="mailto:${SITE.email}">${SITE.email}</a>` : '',
+    SITE.phone ? `<a href="tel:+972${SITE.phone.replace(/\D/g, '').replace(/^0/, '')}">${SITE.phone}</a>` : ''
+  ].filter(Boolean).join('<span class="sep">·</span>');
+  $('#a-text').innerHTML = paras(SITE.about) +
+    (contact ? `<p class="ts contact"><span class="lbl">Contact</span>${contact}</p>` : '') +
+    (SITE.aboutHe && SITE.aboutHe.length ? `<div class="he" dir="rtl" lang="he">${paras(SITE.aboutHe)}</div>` : '');
+}
 
 /* =====================================================================
    state + geometry (mirrors the reference: "in" = hero, "out" = card row)
@@ -398,7 +424,7 @@ let lastT = performance.now(), pgnIdx = -1;
 const KEYS = ['x', 'y', 'w', 'h', 's', 'o'];
 function frame(now) {
   const dt = Math.min(.05, (now - lastT) / 1000); lastT = now;
-  scroll.cur += (scroll.tar - scroll.cur) * (1 - Math.exp(-dt * 6));
+  scroll.cur += (scroll.tar - scroll.cur) * (1 - Math.exp(-dt * 7.5));
   if (Math.abs(scroll.tar - scroll.cur) < .05) scroll.cur = scroll.tar;
   const kS = 1 - Math.exp(-dt * 8.5), kF = 1 - Math.exp(-dt * 14), kP = 1 - Math.exp(-dt * 3.2);
   const settled = mode === 'out' && now > transUntil;
@@ -709,7 +735,7 @@ addEventListener('wheel', e => {
     const now = performance.now();
     if (now < wheelLock || now < lockUntil || Math.abs(d) < 8) return;
     wheelLock = now + 1200; toOut();
-  } else scroll.tar = clamp(scroll.tar + d * 1.1, 0, maxScroll);
+  } else scroll.tar = clamp(scroll.tar + d * 1.6, 0, maxScroll);
 }, {passive: true});
 
 addEventListener('keydown', e => {
@@ -740,7 +766,7 @@ cardsEl.addEventListener('pointermove', e => {
   if (!drag) return;
   const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
   if (Math.max(Math.abs(dx), Math.abs(dy)) > 6) drag.moved = true;
-  if (mode === 'out' && drag.moved) { body.classList.add('dragging'); scroll.tar = clamp(drag.s - dx * 1.4, 0, maxScroll); }
+  if (mode === 'out' && drag.moved) { body.classList.add('dragging'); scroll.tar = clamp(drag.s - dx * 1.8, 0, maxScroll); }
 });
 const endDrag = (e, cancel) => {
   if (!drag) return; const d = drag; drag = null; body.classList.remove('dragging');
