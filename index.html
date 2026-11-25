@@ -169,8 +169,9 @@ body.clean .fig .ph::after{opacity:0}
 /* about */
 #about .wrap{min-height:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:0 40px}
 #about .l{padding:22vh 0 12vh}
-#about .r{padding:22vh 0 14vh 0;font-size:clamp(22px,2.8125vw,54px);line-height:1.3;letter-spacing:-.02em}
-#about .r p+p{margin-top:2.2em}
+#about .r{padding:22vh 0 14vh 0;font-size:clamp(16px,1.45vw,25px);line-height:1.55;letter-spacing:-.01em}
+#about .r .nm{font-weight:500;font-size:clamp(30px,3.4vw,64px);line-height:1.1;letter-spacing:-.025em;margin-bottom:.8em}
+#about .r p+p{margin-top:1.1em}
 #about .r .ts{font-size:clamp(14px,1.25vw,22px);line-height:1.5;color:var(--mute);letter-spacing:-.01em}
 #about .r .ts a{color:var(--ink);transition:opacity .3s}#about .r .ts a:hover{opacity:.5}
 #about .r .contact{margin-top:2.2em;font-family:var(--mono);font-size:clamp(12px,.95vw,16px);letter-spacing:.04em;display:flex;flex-wrap:wrap;gap:.4em .9em;align-items:baseline}
@@ -178,7 +179,7 @@ body.clean .fig .ph::after{opacity:0}
 #about .r .contact .sep{color:var(--mute)}
 /* Hebrew version: right-to-left, separated by a blueprint rule */
 #about .r .he{margin-top:3.2em;padding-top:2.4em;border-top:1px solid var(--edge);font-family:"Heebo",var(--sans);letter-spacing:0}
-#about .r .he p+p{margin-top:1.6em}
+#about .r .he p+p{margin-top:1.1em}
 #about .logo{display:block;width:min(360px,100%);height:auto;margin:0 0 22px;pointer-events:none;-webkit-user-drag:none}
 /* blueprint on/off switch (lives on the About page) */
 #tog{display:inline-block;padding:11px 18px;border:1px solid var(--edge);font:500 11px/1 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;transition:background .25s,color .25s}
@@ -270,15 +271,15 @@ body:not([data-view="work"]) #idxbtn{opacity:0;pointer-events:none}
 const SITE = {
   name: 'Inbar Viente',
   titlePrefix: 'Plate',          // slide title: "Plate 01"
-  // About page — first paragraph is set large, the rest smaller
+  // About page — the name is shown large on top; all paragraphs share one size
   about: [
-    'I’m Inbar Viente, and my background is in building things. I have a strong foundation in mathematics and physics, I program in C and work in Figma and Photoshop. In high school I was the head integrator of my FIRST Robotics Competition (FRC) team, where I designed and built robot mechanisms.',
-    'Photography is my hobby. I shoot the everyday — city streets at dusk, signs, street art and the small, odd details most people walk past — whenever something catches my eye.',
-    'I’m currently serving in a technical role. The photographs on this site come straight from my album and are refreshed every day.'
+    'I’m Inbar Viente, and my background is in building things. I have a strong foundation in mathematics and physics, I program in C, and I work with Figma and Photoshop. In high school, I was the head integrator of my FIRST Robotics Competition (FRC) team, where I designed and built robot mechanisms.',
+    'I do photography as a hobby. I shoot things that interest me: signs, street art, and the small, odd details that catch my eye.',
+    'I’m currently serving in a technical role. The photographs on this site come straight from my personal album and are refreshed every day.'
   ],
   aboutHe: [
-    'אני ענבר, והרקע שלי הוא בבנייה של דברים. יש לי בסיס חזק במתמטיקה ובפיזיקה, אני מתכנתת בשפת C ועובדת ב-Figma וב-Photoshop. בתיכון הייתי ראש צוות האינטגרציה בקבוצת ה-FRC שלי, שבה תכננתי ובניתי מכלולים לרובוט.',
-    'צילום הוא התחביב שלי. אני מצלמת את היומיום — רחובות בשעת דמדומים, שלטים, אמנות רחוב והפרטים הקטנים והמוזרים שרוב האנשים עוברים לידם בלי לשים לב — בכל פעם שמשהו תופס לי את העין.',
+    'אני ענבר, ואני בונה דברים. יש לי רקע במתמטיקה ובפיזיקה, אני מתכנתת בשפת C ועובדת ב-Figma ו-Photoshop. בתיכון הייתי ראש צוות האינטגרציה בקבוצת ה-FRC שלי, שבה תכננתי ובניתי מכלולים לרובוט.',
+    'אני מצלמת כתחביב. אני מצלמת דברים שמעניינים אותי: שלטים, אמנות רחוב ודברים קטנים ומוזרים שתופסים לי את העין.',
     'כיום אני משרתת בתפקיד טכני. התמונות באתר מגיעות ישירות מהאלבום שלי ומתעדכנות מדי יום.'
   ],
   email: 'inbar.viente@gmail.com',   // hidden when empty
@@ -328,12 +329,12 @@ document.title = SITE.name + ' — Plates';
 const fmt = d => d ? new Date(d).toLocaleDateString('en-GB', {day: '2-digit', month: '2-digit', year: '2-digit'}) : '—';
 const syncT = A.updated ? Date.parse(A.updated) : null;
 {
-  const paras = arr => (arr || []).map((t, i) => `<p${i ? ' class="ts"' : ''}>${t}</p>`).join('');
+  const paras = arr => (arr || []).map(t => `<p>${t}</p>`).join('');
   const contact = [
     SITE.email ? `<a href="mailto:${SITE.email}">${SITE.email}</a>` : '',
     SITE.phone ? `<a href="tel:+972${SITE.phone.replace(/\D/g, '').replace(/^0/, '')}">${SITE.phone}</a>` : ''
   ].filter(Boolean).join('<span class="sep">·</span>');
-  $('#a-text').innerHTML = paras(SITE.about) +
+  $('#a-text').innerHTML = `<h1 class="nm">${SITE.name}</h1>` + paras(SITE.about) +
     (contact ? `<p class="ts contact"><span class="lbl">Contact</span>${contact}</p>` : '') +
     (SITE.aboutHe && SITE.aboutHe.length ? `<div class="he" dir="rtl" lang="he">${paras(SITE.aboutHe)}</div>` : '');
 }
